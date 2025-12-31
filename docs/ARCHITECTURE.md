@@ -2,7 +2,7 @@
 
 ## High-Level Overview
 
-````mermaid
+```mermaid
 graph TB
     A[Browser] -->|HTTP/REST| B[Flask API]
     B --> C[DuckDB Analytics]
@@ -25,7 +25,7 @@ graph TB
     end
     ```
 
-Component Breakdown
+## Component Breakdown
 
 | Layer        | Technology                  | Purpose                         |
 | ------------ | --------------------------- | ------------------------------- |
@@ -34,11 +34,11 @@ Component Breakdown
 | Analytics    | DuckDB                      | High-performance OLAP queries   |
 | Scoring      | Custom Python Algorithm     | Multi-factor risk calculation   |
 
-Data Flow
+## Data Flow
 
 1. User Request → Flask API
 2. Query DuckDB → Raw device/account data
 3. Risk Engine → Calculate scores
 4. D3.js → Render interactive graph
 5. User Interaction → Real-time updates
-````
+
