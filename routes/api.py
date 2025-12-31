@@ -6,7 +6,7 @@ Serves JSON data for frontend visualizations and external consumers.
 from flask import Blueprint, jsonify, request
 from sqlalchemy import func
 from app import db
-from src.models import Device, Account, DeviceAccountCrossing, RiskScoringHistory
+from src.models import Device, Account, DeviceAccountCrossing
 from src.risk_calculator import RiskCalculator
 from src.device_matcher import DeviceMatcher
 
@@ -59,7 +59,7 @@ def get_graph_data():
     
     # Fetch recent crossings
     crossings = DeviceAccountCrossing.query.order_by(
-        DeviceAccountCrossing.last_seen.desc()
+        DeviceAccountCrossing.first_seen.desc()
     ).limit(limit).all()
     
     nodes = {}
@@ -68,7 +68,7 @@ def get_graph_data():
     for c in crossings:
         # Device Node
         if c.device_id not in nodes:
-            device = Device.query.get(c.device_id)
+            device = db.session.get(Device, c.device_id)
             if device:
                 nodes[c.device_id] = {
                     'id': c.device_id,
@@ -79,7 +79,7 @@ def get_graph_data():
         
         # Account Node
         if c.account_id not in nodes:
-            account = Account.query.get(c.account_id)
+            account = db.session.get(Account, c.account_id)
             if account:
                 nodes[c.account_id] = {
                     'id': c.account_id,
@@ -114,13 +114,13 @@ def calculate_risk():
     if not device_id:
         return jsonify({'error': 'device_id required'}), 400
         
-    device = Device.query.get(device_id)
+    device = db.session.get(Device, device_id)
     if not device:
         return jsonify({'error': 'Device not found'}), 404
         
     # Load related data
     crossings = DeviceAccountCrossing.query.filter_by(device_id=device_id).all()
-    accounts = [Account.query.get(c.account_id) for c in crossings]
+    accounts = [db.session.get(Account, c.account_id) for c in crossings]
     
     # Calculate
     calculator = RiskCalculator()
@@ -131,7 +131,7 @@ def calculate_risk():
     
     risk_result = calculator.calculate_device_risk(
         device.to_dict(), 
-        [a.to_dict() for a in accounts],
+        [a.to_dict() for a in accounts if a],
         ip_data,
         matcher
     )

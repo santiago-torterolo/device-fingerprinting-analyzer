@@ -28,8 +28,7 @@ def create_app(config_name='development'):
     
     db.init_app(app)
     
-    with app.app_context():
-        db.create_all()
+    # db.create_all() is moved to setup scripts to avoid issues with different SQL dialects
     
     from routes.views import views_bp
     from routes.api import api_bp

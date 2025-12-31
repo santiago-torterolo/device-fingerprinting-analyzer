@@ -1,0 +1,94 @@
+/* Modern Dashboard Variables */
+:root {
+    --primary-color: #4e73df;
+    --secondary-color: #858796;
+    --success-color: #1cc88a;
+    --info-color: #36b9cc;
+    --warning-color: #f6c23e;
+    --danger-color: #e74a3b;
+    --dark-bg: #f8f9fc;
+    --sidebar-width: 250px;
+}
+
+body {
+    background-color: var(--dark-bg);
+    font-family: 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow-x: hidden;
+}
+
+/* Sidebar Styling */
+.sidebar {
+    background: white;
+    min-height: 100vh;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    z-index: 100;
+}
+
+.nav-link {
+    color: #6e707e;
+    padding: 1rem;
+    font-weight: 700;
+    transition: all 0.2s;
+}
+
+.nav-link:hover {
+    color: var(--primary-color);
+    background: #f8f9fa;
+    padding-left: 1.5rem;
+}
+
+.nav-link.active {
+    color: var(--primary-color);
+    border-left: 4px solid var(--primary-color);
+    background: #f0f3ff;
+}
+
+/* Card Styling */
+.card {
+    border: none;
+    border-radius: 0.35rem;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    transition: transform 0.2s;
+    margin-bottom: 24px;
+}
+
+.border-left-primary {
+    border-left: 0.25rem solid var(--primary-color) !important;
+}
+
+.border-left-success {
+    border-left: 0.25rem solid var(--success-color) !important;
+}
+
+.border-left-warning {
+    border-left: 0.25rem solid var(--warning-color) !important;
+}
+
+/* Risk Badges */
+.badge-risk-high {
+    background-color: rgba(231, 74, 59, 0.1);
+    color: var(--danger-color);
+    padding: 0.5em 1em;
+}
+
+.badge-risk-medium {
+    background-color: rgba(246, 194, 62, 0.1);
+    color: #856404;
+    padding: 0.5em 1em;
+}
+
+.badge-risk-low {
+    background-color: rgba(28, 200, 138, 0.1);
+    color: var(--success-color);
+    padding: 0.5em 1em;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+    animation: fadeIn 0.5s ease-out forwards;
+}

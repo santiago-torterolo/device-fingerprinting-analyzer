@@ -1,6 +1,7 @@
 """
 Application configuration.
 Environment variables and database setup for different deployment contexts.
+Supports DuckDB (local) and PostgreSQL (production).
 """
 
 import os
@@ -22,13 +23,13 @@ class Config:
 
 
 class DevelopmentConfig(Config):
-    """Development environment configuration."""
+    """Development environment configuration - DUCKDB."""
     
     DEBUG = True
     TESTING = False
     SQLALCHEMY_DATABASE_URI = os.getenv(
         'DATABASE_URL',
-        'postgresql://fraud_analyst:dev123456@localhost:5432/device_fp_db'
+        'duckdb:///data/device_fp.db'  # ← DUCKDB LOCAL
     )
 
 
@@ -41,11 +42,14 @@ class TestingConfig(Config):
 
 
 class ProductionConfig(Config):
-    """Production environment configuration."""
+    """Production environment configuration - PostgreSQL."""
     
     DEBUG = False
     TESTING = False
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        'DATABASE_URL', 
+        'postgresql://fraud_analyst:dev123456@localhost:5432/device_fp_db'
+    )
 
 
 def get_config():
