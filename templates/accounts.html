@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Account Analysis</h2>
+    <div class="text-muted">Analyzing crossing patterns across {{ stats.total_accounts }} accounts</div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="accounts-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Account Hash</th>
+                        <th>KYC Level</th>
+                        <th>Risk Score</th>
+                        <th>Risk Level</th>
+                        <th>Devices</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody id="accounts-body">
+                    <!-- Loaded via JS/API -->
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2 mb-0">Loading account data...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadAccounts() {
+    fetch('/api/accounts?per_page=50')
+        .then(res => res.json())
+        .then(data => {
+            const body = document.getElementById('accounts-body');
+            body.innerHTML = '';
+            
+            data.accounts.forEach(acc => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><code>${acc.account_hash.substring(0, 12)}...</code></td>
+                    <td><span class="badge ${acc.kyc_level === 'verified' ? 'bg-success' : 'bg-warning'}">${acc.kyc_level}</span></td>
+                    <td>${acc.risk_score.toFixed(1)}</td>
+                    <td><span class="badge bg-${acc.risk_level === 'high' ? 'danger' : 'info'}">${acc.risk_level}</span></td>
+                    <td><span class="badge bg-light text-dark">${acc.device_count || 0}</span></td>
+                    <td><small>${new Date(acc.created_at).toLocaleDateString()}</small></td>
+                `;
+                body.appendChild(row);
+            });
+        });
+}
+
+loadAccounts();
+</script>
+{% endblock %}

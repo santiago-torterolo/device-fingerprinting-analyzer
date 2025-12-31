@@ -142,3 +142,58 @@ def calculate_risk():
     db.session.commit()
     
     return jsonify(risk_result)
+
+
+@api_bp.route('/rules', methods=['GET'])
+def get_rules():
+    """Get the active list of risk scoring rules."""
+    calculator = RiskCalculator()
+    return jsonify(calculator.get_rules())
+
+
+@api_bp.route('/search', methods=['GET'])
+def search():
+    """Global search for devices or accounts by hash."""
+    query = request.args.get('q', '').strip()
+    if not query or len(query) < 4:
+        return jsonify({'results': []})
+    
+    devices = Device.query.filter(Device.device_hash.ilike(f"%{query}%")).limit(5).all()
+    accounts = Account.query.filter(Account.account_hash.ilike(f"%{query}%")).limit(5).all()
+    
+    results = []
+    for d in devices:
+        results.append({'type': 'device', 'id': d.device_id, 'hash': d.device_hash, 'label': f"{d.os} {d.browser}"})
+    for a in accounts:
+        results.append({'type': 'account', 'id': a.account_id, 'hash': a.account_hash, 'label': f"Account ({a.kyc_level})"})
+        
+    return jsonify({'results': results})
+
+
+@api_bp.route('/stats/distribution', methods=['GET'])
+def get_stats_distribution():
+    """Get distribution data for charts (OS and Browser)."""
+    os_dist = db.session.query(Device.os, func.count(Device.device_id)).group_by(Device.os).all()
+    browser_dist = db.session.query(Device.browser, func.count(Device.device_id)).group_by(Device.browser).all()
+    
+    return jsonify({
+        'os': [{'label': row[0], 'value': row[1]} for row in os_dist],
+        'browser': [{'label': row[0], 'value': row[1]} for row in browser_dist]
+    })
+
+
+@api_bp.route('/alerts', methods=['GET'])
+def get_alerts():
+    """Fetch simulated high-risk alerts."""
+    # In a real app, this would query a dedicated alerts table
+    recent_risky = Device.query.filter(Device.risk_score > 60).order_by(Device.created_at.desc()).limit(10).all()
+    
+    alerts = []
+    for d in recent_risky:
+        alerts.append({
+            'timestamp': d.created_at.isoformat(),
+            'message': f"Critical risk detected on {d.os}/{d.browser}",
+            'id': d.device_id,
+            'score': float(d.risk_score)
+        })
+    return jsonify(alerts)

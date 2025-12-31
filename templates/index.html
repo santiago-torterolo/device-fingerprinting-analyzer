@@ -41,13 +41,14 @@
 <div class="row">
     <!-- Top Risky Devices -->
     <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-white">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Top High-Risk Devices</h5>
+                <span class="badge bg-light text-dark">Top 10</span>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover align-middle">
                         <thead>
                             <tr>
                                 <th>OS / Browser</th>
@@ -60,18 +61,31 @@
                             {% for device in top_devices %}
                             <tr>
                                 <td>
-                                    <i class="fab fa-{{ device.os|lower }}"></i> {{ device.os }} 
-                                    <small class="text-muted">{{ device.browser }}</small>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm me-3 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                            <i class="fas {{ 'fa-laptop' if device.os == 'Windows' or device.os == 'macOS' else 'fa-mobile-alt' }} text-secondary"></i>
+                                        </div>
+                                        <div>
+                                            <span class="fw-bold">{{ device.os }}</span><br>
+                                            <small class="text-muted">{{ device.browser }}</small>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>
                                     <span class="badge bg-{{ 'danger' if device.risk_level == 'high' else 'warning' }}">
-                                        {{ device.risk_level }}
+                                        {{ device.risk_level|upper }}
                                     </span>
                                 </td>
-                                <td>{{ "%.1f"|format(device.risk_score) }}</td>
+                                <td>
+                                    <div class="progress" style="height: 6px; width: 60px;">
+                                        <div class="progress-bar bg-{{ 'danger' if device.risk_level == 'high' else 'warning' }}" 
+                                             role="progressbar" style="width: {{ device.risk_score }}%"></div>
+                                    </div>
+                                    <small>{{ "%.1f"|format(device.risk_score) }}</small>
+                                </td>
                                 <td>
                                     <a href="{{ url_for('views.device_detail', device_id=device.device_id) }}" 
-                                       class="btn btn-sm btn-outline-primary">View</a>
+                                       class="btn btn-sm btn-primary">Details</a>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -82,29 +96,125 @@
         </div>
     </div>
 
-    <!-- Risk Distribution -->
+    <!-- Live Alerts & Risk Rules -->
     <div class="col-md-4">
-        <div class="card">
-            <div class="card-header bg-white">
-                <h5 class="mb-0">Risk Distribution</h5>
+        <!-- Live Alerts Feed -->
+        <div class="card shadow-sm border-0 mb-4 bg-dark text-white">
+            <div class="card-header bg-transparent border-secondary d-flex justify-content-between">
+                <h6 class="mb-0"><i class="fas fa-satellite-dish me-2 text-danger"></i> Live Security Feed</h6>
+                <div class="spinner-grow spinner-grow-sm text-danger" role="status"></div>
             </div>
-            <div class="card-body">
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        High Risk
-                        <span class="badge bg-danger rounded-pill">{{ stats.risk_distribution.high }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Medium Risk
-                        <span class="badge bg-warning text-dark rounded-pill">{{ stats.risk_distribution.medium }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Low Risk
-                        <span class="badge bg-success rounded-pill">{{ stats.risk_distribution.low }}</span>
-                    </li>
-                </ul>
+            <div class="card-body p-0" style="max-height: 250px; overflow-y: auto;" id="alerts-feed">
+                <!-- Loaded via JS -->
+                <div class="p-4 text-center text-muted">Scanning network...</div>
+            </div>
+        </div>
+
+        <!-- Risk Scoring Rules -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h6 class="mb-0">Active Scoring Rules</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="rules-list">
+                    <!-- Loaded via JS -->
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<div class="row mt-4">
+    <!-- OS Distribution Chart -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white"><h6 class="mb-0 fw-bold">OS Distribution</h6></div>
+            <div class="card-body">
+                <div id="os-chart" style="height: 250px;"></div>
+            </div>
+        </div>
+    </div>
+    <!-- Browser Distribution Chart -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white"><h6 class="mb-0 fw-bold">Browser Distribution</h6></div>
+            <div class="card-body">
+                <div id="browser-chart" style="height: 250px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+// Fetch Rules
+fetch('/api/rules')
+    .then(res => res.json())
+    .then(rules => {
+        const list = document.getElementById('rules-list');
+        list.innerHTML = '';
+        rules.forEach(r => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item d-flex justify-content-between align-items-center py-2';
+            item.innerHTML = `
+                <div>
+                    <span class="small d-block fw-bold">${r.rule}</span>
+                    <span class="badge bg-light text-dark" style="font-size: 0.65rem;">${r.category}</span>
+                </div>
+                <span class="text-danger small">+${r.weight} pts</span>
+            `;
+            list.appendChild(item);
+        });
+    });
+
+// Fetch Alerts
+function loadAlerts() {
+    fetch('/api/alerts')
+        .then(res => res.json())
+        .then(alerts => {
+            const feed = document.getElementById('alerts-feed');
+            feed.innerHTML = '';
+            alerts.forEach(a => {
+                const item = document.createElement('div');
+                item.className = 'p-3 border-bottom border-secondary';
+                item.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-danger small"><i class="fas fa-exclamation-triangle"></i> Alert</span>
+                        <small class="text-muted" style="font-size: 0.7rem;">${a.timestamp.split('T')[1].substring(0,5)}</small>
+                    </div>
+                    <p class="mb-0 small">${a.message}</p>
+                `;
+                feed.appendChild(item);
+            });
+        });
+}
+loadAlerts();
+setInterval(loadAlerts, 10000);
+
+// Charts
+fetch('/api/stats/distribution')
+    .then(res => res.json())
+    .then(data => {
+        // OS Chart
+        new ApexCharts(document.querySelector("#os-chart"), {
+            series: data.os.map(i => i.value),
+            chart: { type: 'donut', height: 250 },
+            labels: data.os.map(i => i.label),
+            colors: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e'],
+            legend: { position: 'bottom' }
+        }).render();
+
+        // Browser Chart
+        new ApexCharts(document.querySelector("#browser-chart"), {
+            series: [{ data: data.browser.map(i => i.value) }],
+            chart: { type: 'bar', height: 250 },
+            plotOptions: { bar: { borderRadius: 4, horizontal: true }},
+            xaxis: { categories: data.browser.map(i => i.label) },
+            colors: ['#4e73df']
+        }).render();
+    });
+</script>
 {% endblock %}

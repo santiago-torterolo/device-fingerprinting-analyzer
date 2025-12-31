@@ -70,63 +70,58 @@ def generate_demo_data():
         conn.commit()
         conn.close()
         
-        print("Tables created successfully")
-        
-        # Generate devices
-        devices = []
+        # 1. Prepare data
         os_list = ['Windows', 'macOS', 'Linux', 'Android', 'iOS']
         browser_list = ['Chrome', 'Firefox', 'Safari', 'Edge']
-        risk_levels = ['low', 'medium', 'high']
+        risk_levels_weights = {'low': (0.6, 1.0, 30.0), 'medium': (0.3, 31.0, 70.0), 'high': (0.1, 71.0, 100.0)}
         
-        for i in range(800):
-            device = Device(
-                device_id=str(uuid4()),
-                device_hash=fake.sha256()[:64],
-                os=random.choice(os_list),
-                browser=random.choice(browser_list),
-                risk_level=random.choices(risk_levels, weights=[0.6, 0.3, 0.1])[0]
-            )
-            db.session.add(device)
-            devices.append(device)
+        device_ids = [str(uuid4()) for _ in range(800)]
+        account_ids = [str(uuid4()) for _ in range(200)]
         
-        db.session.commit()
-        print(f"Created {len(devices)} devices")
+        # 2. Generate crossings and counts
+        crossings = []
+        dev_counts = {rid: 0 for rid in device_ids}
+        acc_counts = {rid: 0 for rid in account_ids}
         
-        # Generate accounts
-        accounts = []
-        kyc_levels = ['verified', 'pending', 'rejected']
-        
-        for i in range(200):
-            account = Account(
-                account_id=str(uuid4()),
-                account_hash=fake.sha256()[:64],
-                kyc_level=random.choices(kyc_levels, weights=[0.7, 0.25, 0.05])[0],
-                risk_level=random.choices(risk_levels, weights=[0.7, 0.25, 0.05])[0]
-            )
-            db.session.add(account)
-            accounts.append(account)
-        
-        db.session.commit()
-        print(f"Created {len(accounts)} accounts")
-        
-        # Generate crossings
-        crossings_count = 0
         for i in range(1200):
-            device = random.choice(devices)
-            account = random.choice(accounts)
-            
-            crossing = DeviceAccountCrossing(
-                id=i + 1,
-                device_id=device.device_id,
-                account_id=account.account_id,
-                risk_flag=random.choices(risk_levels, weights=[0.8, 0.15, 0.05])[0]
-            )
-            db.session.add(crossing)
-            crossings_count += 1
+            d_id = random.choice(device_ids)
+            a_id = random.choice(account_ids)
+            crossings.append({
+                'id': i + 1,
+                'device_id': d_id,
+                'account_id': a_id,
+                'risk_flag': random.choices(['low', 'medium', 'high'], weights=[0.8, 0.15, 0.05])[0]
+            })
+            dev_counts[d_id] += 1
+            acc_counts[a_id] += 1
+
+        # 3. Insert Devices
+        print("Inserting devices...")
+        for d_id in device_ids:
+            level = random.choices(list(risk_levels_weights.keys()), weights=[w[0] for w in risk_levels_weights.values()])[0]
+            m_s, M_s = risk_levels_weights[level][1], risk_levels_weights[level][2]
+            conn.execute(db.text("INSERT INTO devices (device_id, device_hash, os, browser, risk_level, risk_score, account_count) VALUES (:id, :h, :os, :b, :l, :s, :c)"),
+                        {'id': d_id, 'h': fake.sha256()[:64], 'os': random.choice(os_list), 'b': random.choice(browser_list), 'l': level, 's': random.uniform(m_s, M_s), 'c': dev_counts[d_id]})
         
-        db.session.commit()
-        print(f"Created {crossings_count} crossings")
-        print("Database ready. Run: flask run")
+        # 4. Insert Accounts
+        print("Inserting accounts...")
+        kyc_levels = ['verified', 'pending', 'rejected']
+        for a_id in account_ids:
+            level = random.choices(['low', 'medium', 'high'], weights=[0.7, 0.25, 0.05])[0]
+            m_s, M_s = risk_levels_weights[level][1], risk_levels_weights[level][2]
+            conn.execute(db.text("INSERT INTO accounts (account_id, account_hash, kyc_level, risk_level, risk_score, device_count) VALUES (:id, :h, :k, :l, :s, :c)"),
+                        {'id': a_id, 'h': fake.sha256()[:64], 'k': random.choice(kyc_levels), 'l': level, 's': random.uniform(m_s, M_s), 'c': acc_counts[a_id]})
+        
+        # 5. Insert Crossings
+        print("Inserting crossings...")
+        for c in crossings:
+            conn.execute(db.text("INSERT INTO device_account_crossings (id, device_id, account_id, risk_flag) VALUES (:id, :d, :a, :r)"),
+                        {'id': c['id'], 'd': c['device_id'], 'a': c['account_id'], 'r': c['risk_flag']})
+        
+        conn.commit()
+        conn.close()
+        print(f"Data generation complete: 800 devices, 200 accounts, 1200 crossings.")
+        print("Database ready. Run: python main.py")
 
 if __name__ == "__main__":
     generate_demo_data()

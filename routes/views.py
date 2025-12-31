@@ -73,7 +73,8 @@ def accounts():
     Accounts crossing analysis page.
     DataTable with account details and crossing information.
     """
-    return render_template('accounts.html')
+    account_count = db.session.query(Account).count()
+    return render_template('accounts.html', stats={'total_accounts': account_count})
 
 
 @views_bp.route('/devices/<device_id>', methods=['GET'])

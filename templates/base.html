@@ -46,6 +46,23 @@
 
         <!-- Main Content -->
         <div class="col-md-10 p-4">
+            <!-- Topbar / Search -->
+            <div class="d-flex justify-content-between align-items-center mb-4 bg-white p-3 rounded shadow-sm">
+                <div class="position-relative flex-grow-1 me-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-0"><i class="fas fa-search"></i></span>
+                        <input type="text" id="global-search" class="form-control border-0 bg-light" placeholder="Search by Device or Account Hash..." autocomplete="off">
+                    </div>
+                    <!-- Search Results Dropdown -->
+                    <div id="search-results" class="position-absolute w-100 mt-1 bg-white shadow rounded p-2" style="display: none; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                    </div>
+                </div>
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-danger pulse me-3" id="live-alert-indicator" style="display: none;">NEW ALERT</span>
+                    <i class="fas fa-user-shield text-primary fs-4"></i>
+                </div>
+            </div>
+
             {% block content %}{% endblock %}
         </div>
     </div>
@@ -54,7 +71,64 @@
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
+
+<script>
+// Global Search Logic
+const searchInput = document.getElementById('global-search');
+const resultsBox = document.getElementById('search-results');
+
+searchInput.addEventListener('input', (e) => {
+    const q = e.target.value;
+    if (q.length < 4) {
+        resultsBox.style.display = 'none';
+        return;
+    }
+
+    fetch(`/api/search?q=${q}`)
+        .then(res => res.json())
+        .then(data => {
+            resultsBox.innerHTML = '';
+            if (data.results.length === 0) {
+                resultsBox.innerHTML = '<div class="p-2 text-muted">No results found</div>';
+            } else {
+                data.results.forEach(res => {
+                    const div = document.createElement('div');
+                    div.className = 'p-2 border-bottom search-item';
+                    div.style.cursor = 'pointer';
+                    div.innerHTML = `
+                        <div class="fw-bold"><i class="fas ${res.type === 'device' ? 'fa-laptop' : 'fa-user'} me-2"></i> ${res.label}</div>
+                        <small class="text-muted">${res.hash.substring(0, 24)}...</small>
+                    `;
+                    div.onclick = () => {
+                        window.location.href = res.type === 'device' ? `/devices/${res.id}` : '#';
+                    };
+                    resultsBox.appendChild(div);
+                });
+            }
+            resultsBox.style.display = 'block';
+        });
+});
+
+// Close search on click outside
+document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !resultsBox.contains(e.target)) {
+        resultsBox.style.display = 'none';
+    }
+});
+</script>
+
 {% block scripts %}{% endblock %}
 
+<style>
+.search-item:hover { background-color: #f8f9fa; }
+.pulse {
+    animation: pulse-red 2s infinite;
+}
+@keyframes pulse-red {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+</style>
 </body>
 </html>

@@ -21,7 +21,9 @@ def create_app(config_name='development'):
     Returns:
         Flask application instance
     """
-    app = Flask(__name__)
+    app = Flask(__name__, 
+                template_folder='../templates', 
+                static_folder='../static')
     
     config = get_config()
     app.config.from_object(config)

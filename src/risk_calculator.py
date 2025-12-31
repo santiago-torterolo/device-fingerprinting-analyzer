@@ -59,3 +59,13 @@ class RiskCalculator:
                 'suspicious_accounts': suspicious_accounts
             }
         }
+    def get_rules(self) -> List[Dict]:
+        """Return the current set of risk rules and their weights."""
+        return [
+            {'rule': 'VPN Detection', 'weight': self.weights['vpn'], 'category': 'Network'},
+            {'rule': 'Datacenter IP', 'weight': self.weights['datacenter'], 'category': 'Network'},
+            {'rule': 'Multi-account Device (>3)', 'weight': self.weights['multi_account'], 'category': 'Behavior'},
+            {'rule': 'New Account link', 'weight': self.weights['new_account'], 'category': 'Identity'},
+            {'rule': 'High velocity crossings', 'weight': self.weights['high_velocity'], 'category': 'Behavior'},
+            {'rule': 'Suspicious OS/UA', 'weight': self.weights['suspicious_os'], 'category': 'Device'},
+        ]
