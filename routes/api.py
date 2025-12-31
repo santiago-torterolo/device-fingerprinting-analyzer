@@ -1,0 +1,144 @@
+"""
+REST API endpoints for device fingerprinting data.
+Serves JSON data for frontend visualizations and external consumers.
+"""
+
+from flask import Blueprint, jsonify, request
+from sqlalchemy import func
+from app import db
+from src.models import Device, Account, DeviceAccountCrossing, RiskScoringHistory
+from src.risk_calculator import RiskCalculator
+from src.device_matcher import DeviceMatcher
+
+api_bp = Blueprint('api', __name__)
+
+
+@api_bp.route('/devices', methods=['GET'])
+def get_devices():
+    """Get list of devices with pagination."""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    pagination = Device.query.order_by(Device.last_seen.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return jsonify({
+        'devices': [d.to_dict() for d in pagination.items],
+        'total': pagination.total,
+        'pages': pagination.pages,
+        'current_page': page
+    })
+
+
+@api_bp.route('/accounts', methods=['GET'])
+def get_accounts():
+    """Get list of accounts."""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    pagination = Account.query.order_by(Account.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return jsonify({
+        'accounts': [a.to_dict() for a in pagination.items],
+        'total': pagination.total,
+        'pages': pagination.pages
+    })
+
+
+@api_bp.route('/graph-data', methods=['GET'])
+def get_graph_data():
+    """
+    Get D3.js compatible graph data (nodes and links).
+    Nodes: Devices and Accounts.
+    Links: Crossings.
+    """
+    limit = request.args.get('limit', 100, type=int)
+    
+    # Fetch recent crossings
+    crossings = DeviceAccountCrossing.query.order_by(
+        DeviceAccountCrossing.last_seen.desc()
+    ).limit(limit).all()
+    
+    nodes = {}
+    links = []
+    
+    for c in crossings:
+        # Device Node
+        if c.device_id not in nodes:
+            device = Device.query.get(c.device_id)
+            if device:
+                nodes[c.device_id] = {
+                    'id': c.device_id,
+                    'group': 'device',
+                    'risk_score': float(device.risk_score),
+                    'label': f"{device.os} - {device.browser}"
+                }
+        
+        # Account Node
+        if c.account_id not in nodes:
+            account = Account.query.get(c.account_id)
+            if account:
+                nodes[c.account_id] = {
+                    'id': c.account_id,
+                    'group': 'account',
+                    'risk_score': float(account.risk_score),
+                    'label': f"Account ({account.kyc_level})"
+                }
+        
+        # Link
+        if c.device_id in nodes and c.account_id in nodes:
+            links.append({
+                'source': c.device_id,
+                'target': c.account_id,
+                'value': 1,
+                'risk_flag': c.risk_flag
+            })
+    
+    return jsonify({
+        'nodes': list(nodes.values()),
+        'links': links
+    })
+
+
+@api_bp.route('/calculate-risk', methods=['POST'])
+def calculate_risk():
+    """
+    Trigger risk calculation for a specific device.
+    """
+    data = request.get_json()
+    device_id = data.get('device_id')
+    
+    if not device_id:
+        return jsonify({'error': 'device_id required'}), 400
+        
+    device = Device.query.get(device_id)
+    if not device:
+        return jsonify({'error': 'Device not found'}), 404
+        
+    # Load related data
+    crossings = DeviceAccountCrossing.query.filter_by(device_id=device_id).all()
+    accounts = [Account.query.get(c.account_id) for c in crossings]
+    
+    # Calculate
+    calculator = RiskCalculator()
+    matcher = DeviceMatcher() # In real app, load this from cache/db
+    
+    # Mocking ip_data for now
+    ip_data = {'country': 'DE'}
+    
+    risk_result = calculator.calculate_device_risk(
+        device.to_dict(), 
+        [a.to_dict() for a in accounts],
+        ip_data,
+        matcher
+    )
+    
+    # Update DB
+    device.risk_score = risk_result['risk_score']
+    device.risk_level = risk_result['risk_level']
+    db.session.commit()
+    
+    return jsonify(risk_result)
