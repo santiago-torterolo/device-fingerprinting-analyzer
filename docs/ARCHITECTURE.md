@@ -23,7 +23,7 @@ graph TB
     subgraph "Data Layer"
         C
     end
-    ```
+```
 
 ## Component Breakdown
 
